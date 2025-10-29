@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "849859432437",
+    "project_id": "quotesnap-74d78",
+    "storage_bucket": "quotesnap-74d78.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:849859432437:android:90ddcfcc4ff10ac1391abc",
+        "android_client_info": {
+          "package_name": "uk.ac.tees.mad.quotesnap"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCKcieP5xPRCHoE9arpO7_7spp0gXIjXmU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
