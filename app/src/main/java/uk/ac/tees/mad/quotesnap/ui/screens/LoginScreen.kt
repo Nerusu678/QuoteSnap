@@ -1,6 +1,5 @@
 package uk.ac.tees.mad.quotesnap.ui.screens
 
-import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -32,7 +31,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uk.ac.tees.mad.quotesnap.viewmodels.AuthViewModel
@@ -46,8 +44,6 @@ fun LoginScreen(
     isLoading: Boolean = false,
     errorMessage: String? = null
 ) {
-//    var email by remember { mutableStateOf("") }
-//    var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
@@ -56,16 +52,16 @@ fun LoginScreen(
     val email = loginUiState.value.email
     val password = loginUiState.value.password
 
-    // Email validation
-    val isEmailValid =
-        email.isNotEmpty() && android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
+    // Email and Password validation
+    val isEmailValid = email.isNotEmpty() && android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
     val isPasswordValid = password.length >= 6
     val isFormValid = isEmailValid && isPasswordValid
 
-    // Gradient using Material Theme colors
+    // Gradient colors
     val gradientColors = listOf(
         Color(0xFF6B4CE6),
-        Color(0xFF9D4CE6), Color(0xFFFF6B9D)
+        Color(0xFF9D4CE6),
+        Color(0xFFFF6B9D)
     )
 
     Box(
@@ -129,7 +125,6 @@ fun LoginScreen(
                     OutlinedTextField(
                         value = email,
                         onValueChange = {
-//                            email = it
                             authViewModel.updateEmailLogin(it)
                         },
                         label = { Text("Email") },
@@ -148,7 +143,10 @@ fun LoginScreen(
                             onNext = { focusManager.moveFocus(FocusDirection.Down) }
                         ),
                         singleLine = true,
-                        isError = email.isNotEmpty() && !isEmailValid
+                        isError = email.isNotEmpty() && !isEmailValid,
+                        supportingText = if (email.isNotEmpty() && !isEmailValid) {
+                            { Text("Enter valid email") }
+                        } else null
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -157,7 +155,6 @@ fun LoginScreen(
                     OutlinedTextField(
                         value = password,
                         onValueChange = {
-//                            password = it
                             authViewModel.updatePasswordLogin(it)
                         },
                         label = { Text("Password") },
@@ -298,4 +295,3 @@ fun LoginScreen(
         }
     }
 }
-

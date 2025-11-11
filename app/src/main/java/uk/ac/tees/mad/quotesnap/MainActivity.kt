@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import dagger.hilt.android.AndroidEntryPoint
 import uk.ac.tees.mad.quotesnap.navigation.AppNavigation
+import uk.ac.tees.mad.quotesnap.ui.screens.LoginScreen
 import uk.ac.tees.mad.quotesnap.ui.screens.SplashScreen
 import uk.ac.tees.mad.quotesnap.ui.theme.QuoteSnapTheme
 
@@ -24,8 +25,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             QuoteSnapTheme {
+
+                AppNavigation()
 //                AppNavigation()
-                SplashScreen {  }
+//                SplashScreen {  }
+//                LoginScreen()
             }
         }
     }
