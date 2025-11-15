@@ -4,6 +4,10 @@ sealed class Screen(val route:String){
 
     object SignUpScreen:Screen("sign_up")
     object LoginScreen:Screen("login_in")
-    object HomeScreen:Screen("home")
     object SplashScreen:Screen("splash")
+
+    object MainScreen:Screen("main")
+    object QuoteEditorScreen : Screen("quote_editor/{extractedText}") {
+        fun createRoute(extractedText: String) = "quote_editor/$extractedText"
+    }
 }

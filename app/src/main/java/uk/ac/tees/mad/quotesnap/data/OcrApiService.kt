@@ -1,6 +1,7 @@
 package uk.ac.tees.mad.quotesnap.data
 
 import okhttp3.MultipartBody
+import retrofit2.http.Header
 import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
@@ -13,7 +14,7 @@ interface OcrApiService {
     @Multipart  // uploading an image
     @POST("parse/image")
     suspend fun extractTextFromImage(
-        @Query("apikey") apikey:String,
+        @Header("apikey") apikey:String,
         @Query("language") language: String = "eng",
         @Query("isOverlayRequired") isOverlayRequired: Boolean = false,
         @Query("detectOrientation") detectOrientation: Boolean = true,

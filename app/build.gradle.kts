@@ -109,4 +109,10 @@ dependencies {
 
     // Accompanist Permissions
     implementation("com.google.accompanist:accompanist-permissions:0.32.0")
+
+    implementation("com.google.guava:guava:31.1-android")
+
+
+
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
 }
