@@ -1,5 +1,6 @@
 package uk.ac.tees.mad.quotesnap.viewmodels
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -126,6 +127,29 @@ class AuthViewModel @Inject constructor(
                     )
                 }
             }
+        }
+    }
+
+    // forgot password
+    fun forgotPassword(
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit,
+    ){
+        val email=_loginUiState.value.email
+        if(email.isBlank()){
+            onError("Please enter email")
+            return
+        }
+        viewModelScope.launch {
+            FirebaseAuth.getInstance().sendPasswordResetEmail(email)
+                .addOnCompleteListener{task->
+                    if(task.isSuccessful ){
+                        Log.d("Auth", "Reset email sent to: $email")
+                        onSuccess()
+                    }else{
+                        onError(task.exception?.message ?: "Failed to send reset email")
+                    }
+                }
         }
     }
 

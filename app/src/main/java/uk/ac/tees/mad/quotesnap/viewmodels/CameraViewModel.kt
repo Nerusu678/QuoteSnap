@@ -3,6 +3,7 @@ package uk.ac.tees.mad.quotesnap.viewmodels
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.ViewModel
@@ -27,7 +28,6 @@ class CameraViewModel @Inject constructor(
     private val _cameraState = MutableStateFlow(CameraState())
     val cameraState = _cameraState.asStateFlow()
 
-    // Called when image is captured - just saves the URI
     fun onImageCaptured(imageUri: Uri) {
         _cameraState.update {
             it.copy(
@@ -39,86 +39,48 @@ class CameraViewModel @Inject constructor(
         }
     }
 
-    // Called when user confirms to process the image
     fun processImage(context: Context) {
         val imageUri = _cameraState.value.capturedImageUri ?: return
 
         viewModelScope.launch {
             var tempFile: File? = null
             try {
-                // Step 1: Update state to show loading (keep showPreview true)
-                _cameraState.update {
-                    it.copy(
-                        isProcessing = true,
-                        errorMessage = null
-                    )
-                }
+                _cameraState.update { it.copy(isProcessing = true, errorMessage = null) }
 
-                // Step 2: Convert URI to file and handle rotation
-                val inputStream = context.contentResolver.openInputStream(imageUri)
-                    ?: return@launch
-
-                // Read image as bitmap
+                // Read and process image
+                val inputStream = context.contentResolver.openInputStream(imageUri) ?: return@launch
                 val originalBitmap = BitmapFactory.decodeStream(inputStream)
                 inputStream.close()
 
-                // ✅ FIX: Apply EXIF rotation to ensure text is right-side-up
-                val rotatedBitmap = rotateImageIfRequired(context, imageUri, originalBitmap)
-
-                // Recycle original if it was rotated
+                // Apply EXIF rotation for OCR accuracy
+                val rotatedBitmap = applyExifRotation(context, imageUri, originalBitmap)
                 if (rotatedBitmap !== originalBitmap) {
                     originalBitmap.recycle()
                 }
 
-                // Compress and resize image
-                val compressedBitmap = compressImageForOCR(rotatedBitmap)
+                // Compress image for API (max 1MB, 2048x2048)
+                val compressedBitmap = resizeBitmap(rotatedBitmap, 2048, 2048)
+                rotatedBitmap.recycle()
 
-                // Create temporary file with iterative compression
-                tempFile = File(context.cacheDir, "temp_image_${System.currentTimeMillis()}.jpg")
-
-                // Start with quality 90 (less aggressive compression for better OCR)
+                // Save to temp file with quality adjustment
+                tempFile = File(context.cacheDir, "ocr_${System.currentTimeMillis()}.jpg")
                 var quality = 90
-                var fileSize: Long
 
                 do {
-                    tempFile.outputStream().use { outputStream ->
-                        compressedBitmap.compress(
-                            Bitmap.CompressFormat.JPEG,
-                            quality,
-                            outputStream
-                        )
+                    tempFile.outputStream().use { out ->
+                        compressedBitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
                     }
-                    fileSize = tempFile.length()
-
-                    // If still too large, reduce quality
-                    if (fileSize > 1024 * 1024 && quality > 60) {
+                    if (tempFile.length() > 1_048_576 && quality > 60) {
                         quality -= 10
-                        android.util.Log.d("OCR_DEBUG", "File too large (${fileSize / 1024}KB), reducing quality to $quality")
-                    } else {
-                        break
-                    }
-                } while (fileSize > 1024 * 1024 && quality >= 60)
+                    } else break
+                } while (quality >= 60)
 
-                // Log file details for debugging
-                android.util.Log.d("OCR_DEBUG", "Final file size: ${tempFile.length() / 1024} KB")
-                android.util.Log.d("OCR_DEBUG", "Final quality: $quality%")
-                android.util.Log.d("OCR_DEBUG", "Image dimensions: ${compressedBitmap.width}x${compressedBitmap.height}")
-
-                // Recycle bitmaps to free memory
-                rotatedBitmap.recycle()
                 compressedBitmap.recycle()
 
-                // Prepare multipart body for API
+                // Call OCR API
                 val requestBody = tempFile.asRequestBody("image/jpeg".toMediaTypeOrNull())
-                val multipartBody = MultipartBody.Part.createFormData(
-                    "file",
-                    tempFile.name,
-                    requestBody
-                )
+                val multipartBody = MultipartBody.Part.createFormData("file", tempFile.name, requestBody)
 
-                android.util.Log.d("OCR_DEBUG", "Sending OCR request...")
-
-                // Step 3: Call OCR API with proper parameters
                 val response = ocrApiService.extractTextFromImage(
                     apikey = OcrApiService.API_KEY,
                     language = "eng",
@@ -129,37 +91,19 @@ class CameraViewModel @Inject constructor(
                     file = multipartBody
                 )
 
-                android.util.Log.d("OCR_DEBUG", "OCR Response: ${response.parsedResults?.size ?: 0} results")
-                android.util.Log.d("OCR_DEBUG", "OCR Status: ${response.isErroredOnProcessing}")
-                android.util.Log.d("OCR_DEBUG", "Error Message: ${response.errorMessage}")
-                response.parsedResults?.firstOrNull()?.let { result ->
-                    android.util.Log.d("OCR_DEBUG", "Parsed Text Length: ${result.parsedText?.length ?: 0}")
-                    android.util.Log.d("OCR_DEBUG", "First 100 chars: ${result.parsedText?.take(100)}")
-                }
-
-                // Step 4: Extract text from response
+                // Handle response
                 val extractedText = response.parsedResults?.firstOrNull()?.parsedText
 
-                // Step 5: Update state with result
                 if (extractedText.isNullOrEmpty()) {
-                    // Check if API returned an error
                     val errorMsg = if (response.isErroredOnProcessing == true) {
-                        "OCR Error: ${response.errorMessage ?: response.errorMessage ?: "Unknown error"}"
+                        "OCR Error: ${response.errorMessage ?: "Unknown error"}"
                     } else {
-                        "No text found in the image. Please try again with clearer text"
+                        "No text found. Please try again with clearer text"
                     }
-
-                    android.util.Log.w("OCR_DEBUG", "No text extracted: $errorMsg")
-
                     _cameraState.update {
-                        it.copy(
-                            isProcessing = false,
-                            showPreview = false,
-                            errorMessage = errorMsg
-                        )
+                        it.copy(isProcessing = false, showPreview = false, errorMessage = errorMsg)
                     }
                 } else {
-                    android.util.Log.d("OCR_DEBUG", "✅ Text extracted successfully")
                     _cameraState.update {
                         it.copy(
                             isProcessing = false,
@@ -171,70 +115,51 @@ class CameraViewModel @Inject constructor(
                 }
 
             } catch (e: Exception) {
-                android.util.Log.e("OCR_DEBUG", "Exception: ${e.message}", e)
                 _cameraState.update {
                     it.copy(
                         isProcessing = false,
                         showPreview = false,
-                        errorMessage = "Failed to extract text: ${e.message}"
+                        errorMessage = "Failed to extract text: ${e.localizedMessage}"
                     )
                 }
             } finally {
-                // Cleanup: Always delete temporary file
                 tempFile?.delete()
             }
         }
     }
 
-    // Reset the camera state
     fun resetCameraState() {
         _cameraState.value = CameraState()
     }
 
-    // Clear error
     fun clearError() {
-        _cameraState.update {
-            it.copy(errorMessage = null)
-        }
+        _cameraState.update { it.copy(errorMessage = null) }
     }
 
-    // Compress image to under 1MB while maintaining readability for OCR
-    private fun compressImageForOCR(bitmap: Bitmap): Bitmap {
-        // ✅ Better dimensions for OCR (balance between size and readability)
-        val maxWidth = 2048  // Increased for better text clarity
-        val maxHeight = 2048
-
-        val width = bitmap.width
-        val height = bitmap.height
-
-        // Calculate scale to fit within max dimensions
+    private fun resizeBitmap(bitmap: Bitmap, maxWidth: Int, maxHeight: Int): Bitmap {
         val scale = minOf(
-            if (width > maxWidth) maxWidth.toFloat() / width else 1f,
-            if (height > maxHeight) maxHeight.toFloat() / height else 1f
+            if (bitmap.width > maxWidth) maxWidth.toFloat() / bitmap.width else 1f,
+            if (bitmap.height > maxHeight) maxHeight.toFloat() / bitmap.height else 1f
         )
 
-        // Only scale down if needed
         return if (scale < 1f) {
-            val newWidth = (width * scale).toInt()
-            val newHeight = (height * scale).toInt()
+            val newWidth = (bitmap.width * scale).toInt()
+            val newHeight = (bitmap.height * scale).toInt()
             Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
         } else {
             bitmap
         }
     }
 
-    // ✅ NEW: Rotate image according to EXIF orientation
-    private fun rotateImageIfRequired(context: Context, imageUri: Uri, bitmap: Bitmap): Bitmap {
+    private fun applyExifRotation(context: Context, imageUri: Uri, bitmap: Bitmap): Bitmap {
         val inputStream = context.contentResolver.openInputStream(imageUri) ?: return bitmap
 
         val exif = try {
             ExifInterface(inputStream)
         } catch (e: Exception) {
-            android.util.Log.e("OCR_DEBUG", "Error reading EXIF: ${e.message}")
             inputStream.close()
             return bitmap
         }
-
         inputStream.close()
 
         val orientation = exif.getAttributeInt(
@@ -242,32 +167,14 @@ class CameraViewModel @Inject constructor(
             ExifInterface.ORIENTATION_NORMAL
         )
 
-        android.util.Log.d("OCR_DEBUG", "EXIF Orientation: $orientation")
-
-        return when (orientation) {
-            ExifInterface.ORIENTATION_ROTATE_90 -> {
-                android.util.Log.d("OCR_DEBUG", "Rotating image 90°")
-                rotateImage(bitmap, 90f)
-            }
-            ExifInterface.ORIENTATION_ROTATE_180 -> {
-                android.util.Log.d("OCR_DEBUG", "Rotating image 180°")
-                rotateImage(bitmap, 180f)
-            }
-            ExifInterface.ORIENTATION_ROTATE_270 -> {
-                android.util.Log.d("OCR_DEBUG", "Rotating image 270°")
-                rotateImage(bitmap, 270f)
-            }
-            else -> {
-                android.util.Log.d("OCR_DEBUG", "No rotation needed")
-                bitmap
-            }
+        val degrees = when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+            ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+            ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+            else -> return bitmap
         }
-    }
 
-    // Helper to rotate bitmap
-    private fun rotateImage(bitmap: Bitmap, degrees: Float): Bitmap {
-        val matrix = android.graphics.Matrix()
-        matrix.postRotate(degrees)
+        val matrix = Matrix().apply { postRotate(degrees) }
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     }
 }

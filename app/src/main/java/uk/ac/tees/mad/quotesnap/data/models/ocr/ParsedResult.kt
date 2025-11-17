@@ -1,4 +1,4 @@
-package uk.ac.tees.mad.quotesnap.data.models
+package uk.ac.tees.mad.quotesnap.data.models.ocr
 
 import com.google.gson.annotations.SerializedName
 

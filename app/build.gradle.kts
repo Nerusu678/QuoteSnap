@@ -100,12 +100,12 @@ dependencies {
     implementation("androidx.core:core-splashscreen:1.0.1")
 
 
-    // camerax
-    val cameraxVersion = "1.3.1"
-    implementation("androidx.camera:camera-core:$cameraxVersion")
-    implementation("androidx.camera:camera-camera2:$cameraxVersion")
-    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
-    implementation("androidx.camera:camera-view:$cameraxVersion")
+//    // camerax
+//    val cameraxVersion = "1.3.1"
+//    implementation("androidx.camera:camera-core:$cameraxVersion")
+//    implementation("androidx.camera:camera-camera2:$cameraxVersion")
+//    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
+//    implementation("androidx.camera:camera-view:$cameraxVersion")
 
     // Accompanist Permissions
     implementation("com.google.accompanist:accompanist-permissions:0.32.0")

@@ -1,5 +1,6 @@
 package uk.ac.tees.mad.quotesnap.ui.screens
 
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -24,6 +25,7 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -31,6 +33,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uk.ac.tees.mad.quotesnap.viewmodels.AuthViewModel
@@ -40,7 +43,7 @@ fun LoginScreen(
     authViewModel: AuthViewModel,
     onLoginClick: (String, String) -> Unit = { _, _ -> },
     onSignUpClick: () -> Unit = {},
-    onForgotPasswordClick: () -> Unit = {},
+//    onForgotPasswordClick: () -> Unit = {},
     isLoading: Boolean = false,
     errorMessage: String? = null
 ) {
@@ -53,7 +56,8 @@ fun LoginScreen(
     val password = loginUiState.value.password
 
     // Email and Password validation
-    val isEmailValid = email.isNotEmpty() && android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
+    val isEmailValid =
+        email.isNotEmpty() && android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
     val isPasswordValid = password.length >= 6
     val isFormValid = isEmailValid && isPasswordValid
 
@@ -63,6 +67,8 @@ fun LoginScreen(
         Color(0xFF9D4CE6),
         Color(0xFFFF6B9D)
     )
+
+    val context = LocalContext.current
 
     Box(
         modifier = Modifier
@@ -229,10 +235,24 @@ fun LoginScreen(
                             text = "Forgot Password?",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium,
                             modifier = Modifier
-                                .clickable { onForgotPasswordClick() }
-                                .padding(4.dp)
+                                .clickable {
+                                    authViewModel.forgotPassword(
+                                        onSuccess = {
+                                            Toast.makeText(
+                                                context,
+                                                "If this email is registered, a reset link has been sent.",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        },
+                                        onError = { error ->
+                                            Toast.makeText(context, error, Toast.LENGTH_SHORT)
+                                                .show()
+                                        }
+                                    )
+                                }
+                                .padding(4.dp),
+                            fontWeight = FontWeight.Medium
                         )
                     }
 
@@ -294,4 +314,10 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(48.dp))
         }
     }
+}
+
+@Preview
+@Composable
+private fun LoginScreenPreview() {
+//    LoginScreen()
 }
