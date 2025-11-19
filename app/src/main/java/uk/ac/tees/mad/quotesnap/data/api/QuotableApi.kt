@@ -9,7 +9,7 @@ interface QuotableApi {
     @GET("random")
     suspend fun getRandomQuote(
         @Query("tags") tags: String = "motivation",
-        @Query("maxLength") maxLength: Int = 100
+        @Query("maxLength") maxLength: Int = 150
     ): QuotableResponse
 
     companion object {
