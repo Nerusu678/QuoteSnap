@@ -1,23 +1,14 @@
 package uk.ac.tees.mad.quotesnap.data
 
-
-import android.graphics.Bitmap
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.tasks.await
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.MultipartBody
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 import uk.ac.tees.mad.quotesnap.data.api.QuotableApi
 import uk.ac.tees.mad.quotesnap.data.local.PosterDao
 import uk.ac.tees.mad.quotesnap.data.local.SavedPoster
 import uk.ac.tees.mad.quotesnap.data.models.quote.Quote
-import java.io.ByteArrayOutputStream
 import java.util.UUID
 import javax.inject.Inject
 
@@ -28,43 +19,41 @@ class QuoteSnapRepository @Inject constructor(
     private val auth: FirebaseAuth
 ) {
 
-    // ============= QUOTE OPERATIONS =============
 
-    /**
-     * Get a random motivational quote
-     */
+//
+
+//      Get a random motivational quote from API
+
     suspend fun getRandomQuote(): Result<Quote> {
         return try {
-            val response = quotableApi.getRandomQuote(tags = "motivation")
+            val response = quotableApi.getRandomQuote(tags = "motivational")
             Result.success(response.toQuote())
         } catch (e: Exception) {
-            Log.d("QSR", "getRandomQuote: " + e.message)
+            Log.d("QuoteSnapRepository", "getRandomQuote error: ${e.message}")
             Result.failure(e)
         }
     }
 
-    /**
-     * Get quote based on extracted OCR text keywords
-     */
+
+//     * Get quote based on extracted OCR text keywords
+//     * Falls back to random quote if API fails
+
     suspend fun getQuoteForText(extractedText: String): Result<Quote> {
         return try {
-            // Extract keywords from text
             val keywords = extractKeywords(extractedText)
             val tag = keywords.firstOrNull() ?: "motivational"
 
-            Log.d("QSR", "getQuoteForText: " + tag)
+            Log.d("QuoteSnapRepository", "Searching quote with tag: $tag")
             val response = quotableApi.getRandomQuote(tags = tag)
             Result.success(response.toQuote())
         } catch (e: Exception) {
-            Log.d("QSR", "getQuoteForText: " + e.message)
-            // Fallback to random motivational quote
+            Log.d("QuoteSnapRepository", "getQuoteForText error: ${e.message}")
+            // Fallback to random quote
             getRandomQuote()
         }
     }
 
-    /**
-     * Extract motivational keywords from text
-     */
+//     * Extract motivational keywords from text
     private fun extractKeywords(text: String): List<String> {
         val motivationalWords = listOf(
             "success", "dream", "life", "wisdom", "inspirational",
@@ -73,72 +62,14 @@ class QuoteSnapRepository @Inject constructor(
         )
 
         val lowerText = text.lowercase()
-        return motivationalWords.filter { word ->
-            lowerText.contains(word)
-        }
-    }
-
-    // ============= CLOUDINARY UPLOAD =============
-
-    /**
-     * Upload image to Cloudinary and return URL
-     * Replace with your Cloudinary credentials
-     */
-    suspend fun uploadImageToCloudinary(bitmap: Bitmap): Result<String> {
-        return try {
-            // Convert bitmap to bytes
-            val baos = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, baos)
-            val imageBytes = baos.toByteArray()
-
-            // Cloudinary credentials (REPLACE WITH YOURS)
-            val cloudName = "dzyliedn1"  // TODO: Replace
-            val uploadPreset = "unsigned_preset"  // TODO: Replace
-
-            val url = "https://api.cloudinary.com/v1_1/$cloudName/image/upload"
-
-            // Create multipart request
-            val requestBody = MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart(
-                    "file", "poster.jpg",
-                    imageBytes.toRequestBody("image/jpeg".toMediaTypeOrNull())
-                )
-                .addFormDataPart("upload_preset", uploadPreset)
-                .build()
-
-            val request = Request.Builder()
-                .url(url)
-                .post(requestBody)
-                .build()
-
-            // Execute request
-            val client = OkHttpClient()
-            val response = client.newCall(request).execute()
-
-            if (response.isSuccessful) {
-                val responseBody = response.body?.string()
-                val jsonObject = JSONObject(responseBody ?: "")
-                val imageUrl = jsonObject.getString("secure_url")
-                Result.success(imageUrl)
-            } else {
-                Result.failure(Exception("Upload failed: ${response.code}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+        return motivationalWords.filter { word -> lowerText.contains(word) }
     }
 
     // ============= SAVE POSTER =============
 
-    /**
-     * Complete save operation:
-     * 1. Upload image to Cloudinary
-     * 2. Save URL to Firestore
-     * 3. Cache in Room database
-     */
-    suspend fun savePoster(
-        bitmap: Bitmap,
+//     * Save poster design to Firestore and Room
+//     * No image upload - we recreate the poster from design data
+    suspend fun saveDesignOnly(
         quoteText: String,
         author: String,
         backgroundColor: String,
@@ -151,24 +82,17 @@ class QuoteSnapRepository @Inject constructor(
 
             val posterId = UUID.randomUUID().toString()
 
-            // 1. Upload to Cloudinary
-            val uploadResult = uploadImageToCloudinary(bitmap)
-            val imageUrl = uploadResult.getOrElse {
-                return Result.failure(Exception("Image upload failed"))
-            }
-
-            // 2. Create poster object
             val poster = SavedPoster(
                 id = posterId,
                 quoteText = quoteText,
                 author = author,
-                imageUrl = imageUrl,  // Cloudinary URL
+                imageUrl = "",  // No image - recreate from design data
                 backgroundColor = backgroundColor,
                 textColor = textColor,
                 fontSize = fontSize
             )
 
-            // 3. Save to Firestore
+            // Save to Firestore (cloud backup)
             firestore.collection("users")
                 .document(userId)
                 .collection("posters")
@@ -176,27 +100,28 @@ class QuoteSnapRepository @Inject constructor(
                 .set(poster)
                 .await()
 
-            // 4. Cache in Room
+            // Save to Room (local cache for offline access)
             posterDao.insertPoster(poster)
 
+            Log.d("QuoteSnapRepository", "Poster saved successfully: $posterId")
             Result.success(posterId)
         } catch (e: Exception) {
+            Log.e("QuoteSnapRepository", "Save poster error: ${e.message}")
             Result.failure(e)
         }
     }
 
-    // ============= GET POSTERS =============
 
-    /**
-     * Get all saved posters from local cache (Room)
-     */
+
+//     * Get all saved posters from local cache (Room)
+//     * Returns Flow for automatic UI updates
     fun getAllPosters(): Flow<List<SavedPoster>> {
         return posterDao.getAllPosters()
     }
 
-    /**
-     * Sync posters from Firestore to Room
-     */
+
+//     * Sync posters from Firestore to Room
+//     * Useful when user logs in on a new device
     suspend fun syncPostersFromFirestore(): Result<Unit> {
         return try {
             val userId = auth.currentUser?.uid
@@ -213,23 +138,22 @@ class QuoteSnapRepository @Inject constructor(
                 poster?.let { posterDao.insertPoster(it) }
             }
 
+            Log.d("QuoteSnapRepository", "Synced ${snapshot.size()} posters from Firestore")
             Result.success(Unit)
         } catch (e: Exception) {
+            Log.e("QuoteSnapRepository", "Sync error: ${e.message}")
             Result.failure(e)
         }
     }
 
-    // ============= DELETE POSTER =============
 
-    /**
-     * Delete poster from both Firestore and Room
-     */
+//     * Delete poster from both Firestore and Room
     suspend fun deletePoster(posterId: String): Result<Unit> {
         return try {
             val userId = auth.currentUser?.uid
                 ?: return Result.failure(Exception("User not logged in"))
 
-            // Delete from Firestore
+            // Delete from Firestore (cloud)
             firestore.collection("users")
                 .document(userId)
                 .collection("posters")
@@ -237,52 +161,13 @@ class QuoteSnapRepository @Inject constructor(
                 .delete()
                 .await()
 
-            // Delete from Room
+            // Delete from Room (local)
             posterDao.deletePoster(posterId)
 
+            Log.d("QuoteSnapRepository", "Poster deleted: $posterId")
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    suspend fun saveDesignOnly(
-        quoteText: String,
-        author: String,
-        backgroundColor: String,
-        textColor: String,
-        fontSize: Float
-    ): Result<String> {
-        return try {
-            val userId = auth.currentUser?.uid
-                ?: return Result.failure(Exception("User not logged in"))
-
-            val posterId = UUID.randomUUID().toString()
-
-            // Create poster object (no imageUrl needed)
-            val poster = SavedPoster(
-                id = posterId,
-                quoteText = quoteText,
-                author = author,
-                imageUrl = "",  // Empty for now - we'll recreate the image when needed
-                backgroundColor = backgroundColor,
-                textColor = textColor,
-                fontSize = fontSize
-            )
-
-            // Save to Firestore
-            firestore.collection("users")
-                .document(userId)
-                .collection("posters")
-                .document(posterId)
-                .set(poster)
-                .await()
-
-            // Cache in Room
-            posterDao.insertPoster(poster)
-
-            Result.success(posterId)
-        } catch (e: Exception) {
+            Log.e("QuoteSnapRepository", "Delete error: ${e.message}")
             Result.failure(e)
         }
     }
