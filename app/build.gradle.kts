@@ -82,7 +82,7 @@ dependencies {
 
 
     // Retrofit
-    implementation( "com.squareup.retrofit2:retrofit:2.11.0")
+    implementation( "com.squareup.retrofit2:retrofit:2.9.0")
 
 //    Json to kotlin object convertor mapping
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
@@ -115,4 +115,6 @@ dependencies {
 
 
     implementation("androidx.exifinterface:exifinterface:1.3.7")
+
+//    implementation("dev.shreyaspatil.capturable:capturable:2.1.0")
 }

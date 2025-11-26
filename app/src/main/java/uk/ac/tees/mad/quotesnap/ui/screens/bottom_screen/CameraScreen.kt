@@ -56,7 +56,7 @@ fun CameraScreen(
     // Camera permission state
     val cameraPermissionState = rememberPermissionState(permission = Manifest.permission.CAMERA)
 
-    // ✅ FIX: Mutable state that updates on each retake
+    // Mutable state that updates on each retake
     var currentPhotoUri by remember { mutableStateOf<Uri?>(null) }
 
     // Camera launcher
@@ -137,11 +137,11 @@ fun CameraScreen(
             // Default - Show landing screen
             else -> {
                 //  ADD ONLY THIS - Shows toast when error occurs
-                LaunchedEffect(cameraState.errorMessage) {
-                    cameraState.errorMessage?.let {
-                        Toast.makeText(context, it, Toast.LENGTH_LONG).show()
-                    }
-                }
+//                LaunchedEffect(cameraState.errorMessage) {
+//                    cameraState.errorMessage?.let {
+//                        Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+//                    }
+//                }
                 CameraLandingScreen(
                     onOpenCamera = launchCamera
                 )
