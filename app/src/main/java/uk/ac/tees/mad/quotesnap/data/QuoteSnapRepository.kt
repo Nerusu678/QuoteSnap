@@ -150,6 +150,8 @@ class QuoteSnapRepository @Inject constructor(
 //     * Delete poster from both Firestore and Room
     suspend fun deletePoster(posterId: String): Result<Unit> {
         return try {
+            // Delete from Room (local)
+            posterDao.deletePoster(posterId)
             val userId = auth.currentUser?.uid
                 ?: return Result.failure(Exception("User not logged in"))
 
@@ -161,8 +163,6 @@ class QuoteSnapRepository @Inject constructor(
                 .delete()
                 .await()
 
-            // Delete from Room (local)
-            posterDao.deletePoster(posterId)
 
             Log.d("QuoteSnapRepository", "Poster deleted: $posterId")
             Result.success(Unit)
