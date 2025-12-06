@@ -14,7 +14,7 @@ object PosterImageGenerator {
 
     fun generatePosterBitmap(poster: SavedPoster): Bitmap {
         val width = 1080
-        val height = 1920
+        val height = 1080
 
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
@@ -28,6 +28,8 @@ object PosterImageGenerator {
 
         canvas.drawColor(backgroundColor)
 
+//        val fontFamily= PosterFont.fromString(poster.fontFamily).toTypeface()
+
         val textPaint = Paint().apply {
             color = try {
                 poster.textColor.toColorInt()
@@ -37,7 +39,7 @@ object PosterImageGenerator {
             textSize = poster.fontSize * 2 // Scale for higher resolution
             isAntiAlias = true
             textAlign = Paint.Align.CENTER
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+//            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
 
         val authorPaint = Paint().apply {
@@ -45,7 +47,7 @@ object PosterImageGenerator {
             textSize = poster.fontSize * 1.5f
             isAntiAlias = true
             textAlign = Paint.Align.CENTER
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.ITALIC)
+//            typeface = Typeface.create(Typeface.DEFAULT, Typeface.ITALIC)
         }
 
         // Draw quote text (with word wrapping)

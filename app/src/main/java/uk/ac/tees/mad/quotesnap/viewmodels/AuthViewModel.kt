@@ -10,12 +10,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import uk.ac.tees.mad.quotesnap.data.ProfileRepository
 import javax.inject.Inject
 
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
-    private val firebaseAuth: FirebaseAuth
+    private val firebaseAuth: FirebaseAuth,
+    private val profileRepository: ProfileRepository
 ) : ViewModel() {
 
 
@@ -117,6 +119,8 @@ class AuthViewModel @Inject constructor(
 
                 // Create user with email and password
                 val result = firebaseAuth.createUserWithEmailAndPassword(email, password).await()
+                val userId=result.user?.uid?:throw Exception("User id not found")
+                profileRepository.createUserProfile(userId,fullName,email)
                 _signUpUiState.update { it.copy(isLoading = false) }
                 _authState.value = AuthState.Authenticated
             }catch (e: Exception){

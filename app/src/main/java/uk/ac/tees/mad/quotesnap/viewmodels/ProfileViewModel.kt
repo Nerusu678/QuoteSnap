@@ -75,11 +75,12 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
-    fun deleteAccount(onSuccess: () -> Unit) {
+    fun deleteAccount(password:String,onSuccess: () -> Unit) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
 
-            repository.deleteUserAccount()
+            repository.deleteUserAccount(password)
+//            onSuccess()
                 .onSuccess {
                     onSuccess()
                 }
@@ -94,7 +95,7 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
-    fun deleteAllPosters(){
+    fun deleteAllPosters() {
         viewModelScope.launch {
             _uiState.update {
                 it.copy(isLoading = true)
@@ -102,12 +103,12 @@ class ProfileViewModel @Inject constructor(
             repository.deleteAllPosters()
                 .onSuccess {
                     _uiState.update {
-                        it.copy(isLoading =false)
+                        it.copy(isLoading = false)
                     }
                 }
-                .onFailure {error->
+                .onFailure { error ->
                     _uiState.update {
-                        it.copy(isLoading = false, errorMessage =error.message )
+                        it.copy(isLoading = false, errorMessage = error.message)
                     }
                 }
         }
@@ -119,17 +120,20 @@ class ProfileViewModel @Inject constructor(
 
     fun updatePreferences(preferences: UserPreferences) {
         viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
             repository.updateUserPreferences(preferences)
                 .onSuccess {
                     _uiState.update {
                         it.copy(
+                            isLoading = false,
                             userProfile = it.userProfile?.copy(preferences = preferences)
                         )
                     }
                 }
                 .onFailure { error ->
                     _uiState.update {
-                        it.copy(errorMessage = error.message)
+
+                        it.copy(isLoading = false, errorMessage = error.message)
                     }
                 }
         }
@@ -140,9 +144,9 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             try {
 
-                _uiState.update {
-                    it.copy(isLoading = true)
-                }
+//                _uiState.update {
+//                    it.copy(isLoading = true)
+//                }
 
                 // we will get all the posters
                 val result = repository.getAllUserPosters()
@@ -152,7 +156,7 @@ class ProfileViewModel @Inject constructor(
                 val posters = result.getOrNull() ?: emptyList()
                 if (posters.isEmpty()) {
                     onError("No Posters to export")
-                    _uiState.update { it.copy(isLoading = false) }
+//                    _uiState.update { it.copy(isLoading = false) }
                     return@launch
                 }
 
@@ -179,11 +183,11 @@ class ProfileViewModel @Inject constructor(
                 // Clean up temporary image files
                 ZipHelper.cleanUpFiles(imageFiles)
 
-                _uiState.update { it.copy(isLoading = false) }
+//                _uiState.update { it.copy(isLoading = false) }
                 onSuccess(zipFile)
             } catch (e: Exception) {
                 Log.e("ProfileViewModel", "Export error: ${e.message}")
-                _uiState.update { it.copy(isLoading = false) }
+//                _uiState.update { it.copy(isLoading = false) }
                 onError(e.message ?: "Failed to export posters")
             }
         }
@@ -248,6 +252,7 @@ class ProfileViewModel @Inject constructor(
 
 data class ProfileUiState(
     val isLoading: Boolean = false,
+//    val isExporting:Boolean=false,
     val userProfile: UserProfile? = null,
     val errorMessage: String? = null
 )

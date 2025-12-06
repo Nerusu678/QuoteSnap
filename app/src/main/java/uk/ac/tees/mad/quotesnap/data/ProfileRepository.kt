@@ -2,6 +2,7 @@ package uk.ac.tees.mad.quotesnap.data
 
 import android.util.Log
 import com.google.firebase.Timestamp
+import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
@@ -85,10 +86,16 @@ class ProfileRepository @Inject constructor(
         }
     }
 
-    suspend fun deleteUserAccount(): Result<Unit> {
+    suspend fun deleteUserAccount(password:String): Result<Unit> {
         return try {
+
+            val email=auth.currentUser!!.email!!
             val userId = auth.currentUser?.uid
                 ?: return Result.failure(Exception("User not logged in"))
+
+
+            val credential = EmailAuthProvider.getCredential(email, password)
+            auth.currentUser!!.reauthenticate(credential).await()
 
             // Delete all posters from Firestore
             val postersSnapshot = firestore.collection("users")

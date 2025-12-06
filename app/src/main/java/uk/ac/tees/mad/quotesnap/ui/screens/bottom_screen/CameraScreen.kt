@@ -37,6 +37,7 @@ import coil.compose.rememberAsyncImagePainter
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import com.google.accompanist.permissions.shouldShowRationale
 import uk.ac.tees.mad.quotesnap.viewmodels.CameraViewModel
 import java.io.File
 import java.text.SimpleDateFormat
@@ -47,7 +48,7 @@ import java.util.Locale
 fun CameraScreen(
     onBackClick: () -> Unit,
     onProceedToEditor: (String) -> Unit,
-    cameraViewModel: CameraViewModel = hiltViewModel(),
+    cameraViewModel: CameraViewModel ,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -59,6 +60,15 @@ fun CameraScreen(
     // Mutable state that updates on each retake
     var currentPhotoUri by remember { mutableStateOf<Uri?>(null) }
 
+
+    // error handling
+    LaunchedEffect(cameraState.errorMessage) {
+        cameraState.errorMessage?.let {error->
+            Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+
     // Camera launcher
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
@@ -66,12 +76,18 @@ fun CameraScreen(
         if (success && currentPhotoUri != null) {
             triggerVibration(context)
             cameraViewModel.onImageCaptured(currentPhotoUri!!)
+        }else if(!success){
+            Toast.makeText(context, "Camera cancelled", Toast.LENGTH_SHORT).show()
         }
     }
 
     // Function to launch camera with permission check
     val launchCamera: () -> Unit = {
         if (cameraPermissionState.status.isGranted) {
+
+            // ✅ Clear previous errors before launching camera
+            cameraViewModel.clearError()
+
             //  Create new URI each time
             val photoFile = File(
                 context.cacheDir,
@@ -84,13 +100,25 @@ fun CameraScreen(
             )
             val newUri = FileProvider.getUriForFile(
                 context,
-                "${context.packageName}.provider",
+                "${context.packageName}.fileprovider",
                 photoFile
             )
             currentPhotoUri = newUri
             cameraLauncher.launch(newUri)
         } else {
             cameraPermissionState.launchPermissionRequest()
+        }
+    }
+
+    // handle permission denail
+    LaunchedEffect(cameraPermissionState.status) {
+        if (!cameraPermissionState.status.isGranted &&
+            cameraPermissionState.status.shouldShowRationale) {
+            Toast.makeText(
+                context,
+                "Camera permission is required to capture text",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 

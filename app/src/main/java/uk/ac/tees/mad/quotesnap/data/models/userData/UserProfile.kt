@@ -17,6 +17,7 @@ data class UserPreferences(
     val defaultFontSize: Float = 24f,
     val defaultTextColor: String = "#FFFFFF",
     val defaultBackgroundColor: String = "#667eea",
+    val defaultFontFamily: String = "SANS_SERIF", // NEW: Default font
     val theme: String = "light", // "light" or "dark"
     val autoSyncEnabled: Boolean = true
 )

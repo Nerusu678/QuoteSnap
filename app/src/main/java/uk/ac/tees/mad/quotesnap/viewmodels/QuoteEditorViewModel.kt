@@ -1,8 +1,10 @@
 package uk.ac.tees.mad.quotesnap.viewmodels
 
+import android.R.attr.fontFamily
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Typeface
 import android.net.Uri
 import android.util.Log
 import androidx.core.content.FileProvider
@@ -19,6 +21,7 @@ import kotlinx.coroutines.withContext
 import uk.ac.tees.mad.quotesnap.data.ProfileRepository
 import uk.ac.tees.mad.quotesnap.data.QuoteSnapRepository
 import uk.ac.tees.mad.quotesnap.data.models.quote.Quote
+import uk.ac.tees.mad.quotesnap.data.models.userData.PosterFont
 import java.io.File
 import java.io.FileOutputStream
 import javax.inject.Inject
@@ -49,7 +52,8 @@ class QuoteEditorViewModel @Inject constructor(
                         it.copy(
                             backgroundColor = profile.preferences.defaultBackgroundColor,
                             textColor = profile.preferences.defaultTextColor,
-                            fontSize = profile.preferences.defaultFontSize
+                            fontSize = profile.preferences.defaultFontSize,
+                            fontFamily = profile.preferences.defaultFontFamily
                         )
                     }
                     Log.d("QuoteEditorVM", "Loaded preferences: ${profile.preferences}")
@@ -60,7 +64,6 @@ class QuoteEditorViewModel @Inject constructor(
                 }
         }
     }
-
 
 
     // this is
@@ -90,6 +93,15 @@ class QuoteEditorViewModel @Inject constructor(
         }
     }
 
+
+    // In QuoteEditorViewModel.kt
+    fun clearSaveError() {
+        _uiState.update { it.copy(saveError = null) }
+    }
+
+    fun clearSaveSuccess() {
+        _uiState.update { it.copy(savedSuccessfully = false) }
+    }
     fun regenerateQuote() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingQuote = true) }
@@ -135,6 +147,12 @@ class QuoteEditorViewModel @Inject constructor(
         _uiState.update { it.copy(fontSize = size) }
     }
 
+    fun updateFontFamily(font: String) {
+        android.util.Log.d("FontDebug", "ViewModel - updateFontFamily called with: $font")
+        _uiState.update { it.copy(fontFamily = font) }
+        android.util.Log.d("FontDebug", "ViewModel - State updated to: ${_uiState.value.fontFamily}")
+    }
+
     // SIMPLE SAVE - Just save design data
     fun saveDesignOnly() {
         viewModelScope.launch {
@@ -148,13 +166,25 @@ class QuoteEditorViewModel @Inject constructor(
                 author = currentState.editedAuthor,
                 backgroundColor = currentState.backgroundColor,
                 textColor = currentState.textColor,
-                fontSize = currentState.fontSize
+                fontSize = currentState.fontSize,
+                fontFamily = currentState.fontFamily // Include font
             )
                 .onSuccess {
                     _uiState.update {
+//                        it.copy(
+//                            isSaving = false,
+//                            savedSuccessfully = true
+//                        )
                         it.copy(
                             isSaving = false,
-                            savedSuccessfully = true
+                            savedSuccessfully = true,
+                            // ✅ Save current state as "last saved"
+                            lastSavedQuote = currentState.editedQuoteText,
+                            lastSavedAuthor = currentState.editedAuthor,
+                            lastSavedBgColor = currentState.backgroundColor,
+                            lastSavedTextColor = currentState.textColor,
+                            lastSavedFontSize = currentState.fontSize,
+                            lastSavedFontFamily = currentState.fontFamily
                         )
                     }
                 }
@@ -238,6 +268,8 @@ class QuoteEditorViewModel @Inject constructor(
         }
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
 
+//        val fontFamily = PosterFont.fromString(currentState.fontFamily).toTypeface()
+
         // Setup text paint for quote
         val textPaint = android.graphics.Paint().apply {
             color = android.graphics.Color.parseColor(currentState.textColor)
@@ -245,6 +277,7 @@ class QuoteEditorViewModel @Inject constructor(
             textAlign = android.graphics.Paint.Align.CENTER
             isAntiAlias = true
             isFakeBoldText = false
+//            typeface = Typeface.create(fontFamily, Typeface.BOLD)
         }
 
         // Draw quote text with word wrapping
@@ -268,6 +301,7 @@ class QuoteEditorViewModel @Inject constructor(
             textSize = currentState.fontSize * 2f
             textAlign = android.graphics.Paint.Align.CENTER
             isAntiAlias = true
+//            typeface= Typeface.create(fontFamily, Typeface.ITALIC)
             alpha = (255 * 0.9f).toInt()  // 90% opacity
         }
         canvas.drawText(
@@ -281,7 +315,11 @@ class QuoteEditorViewModel @Inject constructor(
     }
 
     // ✅ ADD THIS HELPER FUNCTION
-    private fun wrapText(text: String, paint: android.graphics.Paint, maxWidth: Float): List<String> {
+    private fun wrapText(
+        text: String,
+        paint: android.graphics.Paint,
+        maxWidth: Float
+    ): List<String> {
         val words = text.split(" ")
         val lines = mutableListOf<String>()
         var currentLine = ""
@@ -325,9 +363,28 @@ data class QuoteEditorUiState(
     val backgroundColor: String = "#667eea",  // Default purple gradient
     val textColor: String = "#FFFFFF",        // White text
     val fontSize: Float = 24f,
+    val fontFamily: String = "SANS_SERIF", //  Font family
 
     // Save State
     val isSaving: Boolean = false,
     val saveError: String? = null,
-    val savedSuccessfully: Boolean = false
-)
+    val savedSuccessfully: Boolean = false,
+    // NEW: Track last saved state
+    val lastSavedQuote: String = "",
+    val lastSavedAuthor: String = "",
+    val lastSavedBgColor: String = "",
+    val lastSavedTextColor: String = "",
+    val lastSavedFontSize: Float = 0f,
+    val lastSavedFontFamily: String = "",
+){
+    // check if there is some content change
+    // ✅ Helper function to check if content changed
+    fun hasUnsavedChanges(): Boolean {
+        return editedQuoteText != lastSavedQuote ||
+                editedAuthor != lastSavedAuthor ||
+                backgroundColor != lastSavedBgColor ||
+                textColor != lastSavedTextColor ||
+                fontSize != lastSavedFontSize ||
+                fontFamily != lastSavedFontFamily
+    }
+}

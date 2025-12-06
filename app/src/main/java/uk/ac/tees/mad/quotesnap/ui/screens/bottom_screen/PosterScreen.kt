@@ -19,22 +19,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import uk.ac.tees.mad.quotesnap.data.local.SavedPoster
 import uk.ac.tees.mad.quotesnap.viewmodels.PosterViewModel
 
 @Composable
 fun PosterScreen(
     modifier: Modifier = Modifier,
-    viewModel: PosterViewModel = hiltViewModel()
+    viewModel: PosterViewModel
 ) {
     val savedPosters by viewModel.savedPosters.collectAsState()
-
+    val context = LocalContext.current
     Box(
         modifier = modifier.fillMaxSize()
     ) {
@@ -95,12 +95,16 @@ fun PosterScreen(
                         ) {
                             PosterCard(
                                 poster = poster,
+                                onShare = {
+                                    viewModel.sharePoster(context, poster)
+                                },
                                 onDelete = { viewModel.deletePoster(poster.id) }
                             )
                         }
                     }
                 }
-            }        }
+            }
+        }
     }
 }
 
@@ -194,6 +198,7 @@ fun EmptyPostersState(modifier: Modifier = Modifier) {
 @Composable
 fun PosterCard(
     poster: SavedPoster,
+    onShare: () -> Unit,
     onDelete: () -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -266,7 +271,10 @@ fun PosterCard(
             ) {
                 // Share button
                 IconButton(
-                    onClick = { /* TODO: Share functionality */ },
+                    onClick = {
+                        /* TODO: Share functionality */
+                        onShare()
+                    },
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)

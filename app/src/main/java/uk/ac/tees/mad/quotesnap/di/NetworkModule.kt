@@ -52,9 +52,9 @@ object NetworkModule {
                 .addInterceptor(loggingInterceptor)  // Add logging
                 .sslSocketFactory(sslSocketFactory, trustAllCerts[0] as X509TrustManager)  // Add SSL bypass
                 .hostnameVerifier { _, _ -> true }
-                .connectTimeout(60, TimeUnit.SECONDS)
-                .readTimeout(60, TimeUnit.SECONDS)
-                .writeTimeout(60, TimeUnit.SECONDS)
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(20, TimeUnit.SECONDS)
+                .writeTimeout(15, TimeUnit.SECONDS)
                 .build()
         } catch (e: Exception) {
             throw RuntimeException(e)

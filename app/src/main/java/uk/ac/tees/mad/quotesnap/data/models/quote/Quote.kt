@@ -1,11 +1,13 @@
 package uk.ac.tees.mad.quotesnap.data.models.quote
 
+
+
 data class Quote(
     val content: String = "",
     val author: String = ""
 )
 
-// API Response
+// API Response data class
 data class QuotableResponse(
     val _id: String,
     val content: String,
@@ -17,3 +19,4 @@ data class QuotableResponse(
         author = author
     )
 }
+

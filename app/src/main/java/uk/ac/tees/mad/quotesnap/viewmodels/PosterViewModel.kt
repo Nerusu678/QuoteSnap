@@ -1,10 +1,12 @@
 package uk.ac.tees.mad.quotesnap.viewmodels
 
+import android.R.attr.fontFamily
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Typeface
 import android.net.Uri
 import android.util.Log
 import androidx.core.content.FileProvider
@@ -19,6 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uk.ac.tees.mad.quotesnap.data.QuoteSnapRepository
 import uk.ac.tees.mad.quotesnap.data.local.SavedPoster
+import uk.ac.tees.mad.quotesnap.data.models.userData.PosterFont
 import java.io.File
 import java.io.FileOutputStream
 import javax.inject.Inject
@@ -62,7 +65,7 @@ class PosterViewModel @Inject constructor(
     fun sharePoster(context: Context, poster: SavedPoster) {
         viewModelScope.launch {
             try {
-                val bitmap = createPosterBitmap(poster)  // ← Only this parameter is different
+                val bitmap = createPosterBitmap(poster)  //  Only this parameter is different
                 val uri = saveBitmapToCache(context, bitmap)
                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                     type = "image/png"
@@ -88,12 +91,15 @@ class PosterViewModel @Inject constructor(
         }
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
 
+        // Get selected font
+//        val fontFamily = PosterFont.fromString(poster.fontFamily).toTypeface()
         // Quote text
         val textPaint = Paint().apply {
             color = android.graphics.Color.parseColor(poster.textColor)
             textSize = poster.fontSize * 3f
             textAlign = Paint.Align.CENTER
             isAntiAlias = true
+//            typeface = Typeface.create(fontFamily, Typeface.BOLD)
         }
 
         val quoteText = "\"${poster.quoteText}\""  // ← Direct from poster
@@ -114,6 +120,7 @@ class PosterViewModel @Inject constructor(
             textSize = poster.fontSize * 2f
             textAlign = Paint.Align.CENTER
             isAntiAlias = true
+//            typeface = Typeface.create(fontFamily, Typeface.ITALIC)
             alpha = (255 * 0.9f).toInt()
         }
         canvas.drawText(

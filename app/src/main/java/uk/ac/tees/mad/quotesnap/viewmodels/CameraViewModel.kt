@@ -40,7 +40,10 @@ class CameraViewModel @Inject constructor(
     }
 
     fun processImage(context: Context) {
-        val imageUri = _cameraState.value.capturedImageUri ?: return
+        val imageUri = _cameraState.value.capturedImageUri ?: run {
+            _cameraState.update { it.copy(errorMessage = "No image to process") }
+            return
+        }
 
         viewModelScope.launch {
             var tempFile: File? = null
@@ -48,9 +51,31 @@ class CameraViewModel @Inject constructor(
                 _cameraState.update { it.copy(isProcessing = true, errorMessage = null) }
 
                 // Read and process image
-                val inputStream = context.contentResolver.openInputStream(imageUri) ?: return@launch
+                val inputStream = context.contentResolver.openInputStream(imageUri)
+                if (inputStream == null) {
+                    _cameraState.update {
+                        it.copy(
+                            isProcessing = false,
+                            showPreview = true,  // ✅ CHANGED: Keep preview
+                            errorMessage = "Failed to read image file"
+                        )
+                    }
+                    return@launch
+                }
+
                 val originalBitmap = BitmapFactory.decodeStream(inputStream)
                 inputStream.close()
+
+                if (originalBitmap == null) {
+                    _cameraState.update {
+                        it.copy(
+                            isProcessing = false,
+                            showPreview = true,  // ✅ CHANGED: Keep preview
+                            errorMessage = "Invalid image format"
+                        )
+                    }
+                    return@launch
+                }
 
                 // Apply EXIF rotation for OCR accuracy
                 val rotatedBitmap = applyExifRotation(context, imageUri, originalBitmap)
@@ -79,7 +104,8 @@ class CameraViewModel @Inject constructor(
 
                 // Call OCR API
                 val requestBody = tempFile.asRequestBody("image/jpeg".toMediaTypeOrNull())
-                val multipartBody = MultipartBody.Part.createFormData("file", tempFile.name, requestBody)
+                val multipartBody =
+                    MultipartBody.Part.createFormData("file", tempFile.name, requestBody)
 
                 val response = ocrApiService.extractTextFromImage(
                     apikey = OcrApiService.API_KEY,
@@ -101,24 +127,52 @@ class CameraViewModel @Inject constructor(
                         "No text found. Please try again with clearer text"
                     }
                     _cameraState.update {
-                        it.copy(isProcessing = false, showPreview = false, errorMessage = errorMsg)
+                        it.copy(
+                            isProcessing = false,
+                            showPreview = true,  // ✅ CHANGED: Keep preview
+                            errorMessage = errorMsg
+                        )
                     }
                 } else {
                     _cameraState.update {
                         it.copy(
                             isProcessing = false,
-                            showPreview = false,
+                            showPreview = false,  // ✅ CORRECT: Hide on success
                             isTextExtracted = true,
                             extractedText = extractedText.trim()
                         )
                     }
                 }
 
+            } catch (e: java.net.SocketTimeoutException) {
+                _cameraState.update {
+                    it.copy(
+                        isProcessing = false,
+                        showPreview = true,  // ✅ CHANGED: Keep preview
+                        errorMessage = "Connection timed out. Please check your internet and try again."
+                    )
+                }
+            } catch (e: java.net.UnknownHostException) {
+                _cameraState.update {
+                    it.copy(
+                        isProcessing = false,
+                        showPreview = true,  // ✅ CHANGED: Keep preview
+                        errorMessage = "No internet connection. Please check your network."
+                    )
+                }
+            } catch (e: java.io.IOException) {
+                _cameraState.update {
+                    it.copy(
+                        isProcessing = false,
+                        showPreview = true,  // ✅ CHANGED: Keep preview
+                        errorMessage = "Failed to read image: ${e.localizedMessage}"
+                    )
+                }
             } catch (e: Exception) {
                 _cameraState.update {
                     it.copy(
                         isProcessing = false,
-                        showPreview = false,
+                        showPreview = true,  // ✅ CHANGED: Keep preview
                         errorMessage = "Failed to extract text: ${e.localizedMessage}"
                     )
                 }
@@ -127,6 +181,96 @@ class CameraViewModel @Inject constructor(
             }
         }
     }
+
+
+//    fun processImage(context: Context) {
+//        val imageUri = _cameraState.value.capturedImageUri ?: return
+//
+//        viewModelScope.launch {
+//            var tempFile: File? = null
+//            try {
+//                _cameraState.update { it.copy(isProcessing = true, errorMessage = null) }
+//
+//                // Read and process image
+//                val inputStream = context.contentResolver.openInputStream(imageUri) ?: return@launch
+//                val originalBitmap = BitmapFactory.decodeStream(inputStream)
+//                inputStream.close()
+//
+//                // Apply EXIF rotation for OCR accuracy
+//                val rotatedBitmap = applyExifRotation(context, imageUri, originalBitmap)
+//                if (rotatedBitmap !== originalBitmap) {
+//                    originalBitmap.recycle()
+//                }
+//
+//                // Compress image for API (max 1MB, 2048x2048)
+//                val compressedBitmap = resizeBitmap(rotatedBitmap, 2048, 2048)
+//                rotatedBitmap.recycle()
+//
+//                // Save to temp file with quality adjustment
+//                tempFile = File(context.cacheDir, "ocr_${System.currentTimeMillis()}.jpg")
+//                var quality = 90
+//
+//                do {
+//                    tempFile.outputStream().use { out ->
+//                        compressedBitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
+//                    }
+//                    if (tempFile.length() > 1_048_576 && quality > 60) {
+//                        quality -= 10
+//                    } else break
+//                } while (quality >= 60)
+//
+//                compressedBitmap.recycle()
+//
+//                // Call OCR API
+//                val requestBody = tempFile.asRequestBody("image/jpeg".toMediaTypeOrNull())
+//                val multipartBody = MultipartBody.Part.createFormData("file", tempFile.name, requestBody)
+//
+//                val response = ocrApiService.extractTextFromImage(
+//                    apikey = OcrApiService.API_KEY,
+//                    language = "eng",
+//                    isOverlayRequired = false,
+//                    detectOrientation = true,
+//                    scale = true,
+//                    ocrEngine = 2,
+//                    file = multipartBody
+//                )
+//
+//                // Handle response
+//                val extractedText = response.parsedResults?.firstOrNull()?.parsedText
+//
+//                if (extractedText.isNullOrEmpty()) {
+//                    val errorMsg = if (response.isErroredOnProcessing == true) {
+//                        "OCR Error: ${response.errorMessage ?: "Unknown error"}"
+//                    } else {
+//                        "No text found. Please try again with clearer text"
+//                    }
+//                    _cameraState.update {
+//                        it.copy(isProcessing = false, showPreview = false, errorMessage = errorMsg)
+//                    }
+//                } else {
+//                    _cameraState.update {
+//                        it.copy(
+//                            isProcessing = false,
+//                            showPreview = false,
+//                            isTextExtracted = true,
+//                            extractedText = extractedText.trim()
+//                        )
+//                    }
+//                }
+//
+//            } catch (e: Exception) {
+//                _cameraState.update {
+//                    it.copy(
+//                        isProcessing = false,
+//                        showPreview = false,
+//                        errorMessage = "Failed to extract text: ${e.localizedMessage}"
+//                    )
+//                }
+//            } finally {
+//                tempFile?.delete()
+//            }
+//        }
+//    }
 
     fun resetCameraState() {
         _cameraState.value = CameraState()

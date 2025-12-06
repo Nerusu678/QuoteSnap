@@ -2,6 +2,7 @@ package uk.ac.tees.mad.quotesnap.ui.screens.bottom_screen
 
 
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -19,6 +20,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import uk.ac.tees.mad.quotesnap.data.models.userData.UserPreferences
@@ -35,6 +37,10 @@ fun ProfileScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showPreferencesDialog by remember { mutableStateOf(false) }
 
+    var password by remember {
+        mutableStateOf("")
+    }
+
     var showLogoutDialog by remember {
         mutableStateOf(false)
     }
@@ -43,123 +49,131 @@ fun ProfileScreen(
         mutableStateOf(false)
     }
 
-//    var exportedFile by remember {
-//        mutableStateOf<File?>(null)
-//    }
 
     val context = LocalContext.current
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Profile",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
 
-        Box(
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+    ) {
+//        if (uiState.isLoading ) {
+//            CircularProgressIndicator(
+//                modifier = Modifier.align(Alignment.Center)
+//            )
+//        } else {
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Loading indicator
-            if (uiState.isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center)
+            uiState.userProfile?.let { profile ->
+                // Profile Header with Avatar
+                ProfileHeader(profile.fullName, profile.email)
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Account Information Card
+                AccountInfoCard(
+                    fullName = profile.fullName,
+                    email = profile.email,
+                    onEditClick = { showEditDialog = true }
                 )
-            } else {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    uiState.userProfile?.let { profile ->
-                        // Profile Header with Avatar
-                        ProfileHeader(profile.fullName, profile.email)
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                // Preferences Card
+                PreferencesCard(
+                    preferences = profile.preferences,
+                    onPreferencesClick = { showPreferencesDialog = true }
+                )
 
-                        // Account Information Card
-                        AccountInfoCard(
-                            fullName = profile.fullName,
-                            email = profile.email,
-                            onEditClick = { showEditDialog = true }
-                        )
-
-                        // Preferences Card
-                        PreferencesCard(
-                            preferences = profile.preferences,
-                            onPreferencesClick = { showPreferencesDialog = true }
-                        )
-
-                        // Actions Section
-                        ActionsSection(
-                            onLogoutClick = { showLogoutDialog = true },
-                            onDeleteAccountClick = { showDeleteDialog = true },
-                            onExportPostersClick = { showExportDialog = true }
-                        )
-                    }
-                }
+                // Actions Section
+                ActionsSection(
+                    onLogoutClick = { showLogoutDialog = true },
+                    onDeleteAccountClick = { showDeleteDialog = true },
+                    onExportPostersClick = { showExportDialog = true }
+                )
             }
 
-            // Error Snackbar
-            uiState.errorMessage?.let { error ->
-                Snackbar(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(16.dp),
-                    action = {
-                        TextButton(onClick = { viewModel.clearError() }) {
-                            Text("Dismiss")
-                        }
+        }
+        // ✅ Show loading OVERLAY on top when loading (not replacing content)
+        if (uiState.isLoading && uiState.userProfile != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f)),  // Semi-transparent
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Color.White)
+            }
+        }
+
+        // ✅ Show loading ONLY (for initial load when no profile yet)
+        if (uiState.isLoading && uiState.userProfile == null) {
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
+
+//        if (uiState.isExporting) {
+//            Box(
+//                modifier = Modifier
+//                    .fillMaxSize()
+//                    .background(Color.Black.copy(alpha = 0.5f)),
+//                contentAlignment = Alignment.Center
+//            ) {
+//                CircularProgressIndicator(color = Color.White)
+//            }
+//        }
+
+        // Error Snackbar
+        uiState.errorMessage?.let { error ->
+            Snackbar(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp),
+                action = {
+                    TextButton(onClick = { viewModel.clearError() }) {
+                        Text("Dismiss")
                     }
-                ) {
-                    Text(error)
                 }
+            ) {
+                Text(error)
             }
         }
     }
 
-    // Edit Name Dialog
+
+// Edit Name Dialog
     if (showEditDialog) {
         EditNameDialog(
             currentName = uiState.userProfile?.fullName ?: "",
             onDismiss = { showEditDialog = false },
             onSave = { newName ->
-                viewModel.updateProfile(newName)
                 showEditDialog = false
+                viewModel.updateProfile(newName)
             }
         )
     }
 
 
-    // Preferences Dialog
+// Preferences Dialog
     if (showPreferencesDialog) {
         PreferencesDialog(
             preferences = uiState.userProfile?.preferences ?: UserPreferences(),
             onDismiss = { showPreferencesDialog = false },
             onSave = { newPreferences ->
-                viewModel.updatePreferences(newPreferences)
                 showPreferencesDialog = false
+                viewModel.updatePreferences(newPreferences)
             }
         )
     }
 
 
-    // log out Dialog
+// log out Dialog
     if (showLogoutDialog) {
         LogoutDialog(
             onDismiss = { showLogoutDialog = false },
@@ -172,18 +186,25 @@ fun ProfileScreen(
         )
 
     }
-    // Delete Account Dialog
+// Delete Account Dialog
     if (showDeleteDialog) {
         DeleteAccountDialog(
-            onDismiss = { showDeleteDialog = false },
-            onConfirm = {
-                viewModel.deleteAccount(onSuccess = onLogout)
+            password = password,
+            onPasswordChange = {
+                password = it
+            },
+            onDismiss = {
                 showDeleteDialog = false
+                password = ""
+            },
+            onConfirm = {
+                showDeleteDialog = false
+                viewModel.deleteAccount(password, onSuccess = onLogout)
             }
         )
     }
 
-    // export dialog
+// export dialog
     if (showExportDialog) {
         ExportPostersDialog(
             onDismiss = {
@@ -223,7 +244,7 @@ fun ProfileScreen(
                         showExportDialog = false
                         Toast.makeText(
                             context,
-                            "✗ Export failed: $error",
+                            "Export failed: $error",
                             Toast.LENGTH_LONG
                         ).show()
                     }
@@ -329,48 +350,48 @@ fun ExportPostersDialog(
     )
 }
 
-@Composable
-fun ProfileHeader(fullName: String, email: String) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        // Avatar with gradient background
-        Box(
-            modifier = Modifier
-                .size(100.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(
-                            Color(0xFF667eea),
-                            Color(0xFF764ba2)
-                        )
-                    )
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = fullName.firstOrNull()?.uppercase() ?: "U",
-                style = MaterialTheme.typography.displayMedium,
-                color = Color.White,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        Text(
-            text = fullName,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = email,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
+//@Composable
+//fun ProfileHeader(fullName: String, email: String) {
+//    Column(
+//        horizontalAlignment = Alignment.CenterHorizontally,
+//        verticalArrangement = Arrangement.spacedBy(8.dp)
+//    ) {
+//        // Avatar with gradient background
+//        Box(
+//            modifier = Modifier
+//                .size(100.dp)
+//                .clip(CircleShape)
+//                .background(
+//                    Brush.linearGradient(
+//                        colors = listOf(
+//                            Color(0xFF667eea),
+//                            Color(0xFF764ba2)
+//                        )
+//                    )
+//                ),
+//            contentAlignment = Alignment.Center
+//        ) {
+//            Text(
+//                text = fullName.firstOrNull()?.uppercase() ?: "U",
+//                style = MaterialTheme.typography.displayMedium,
+//                color = Color.White,
+//                fontWeight = FontWeight.Bold
+//            )
+//        }
+//
+//        Text(
+//            text = fullName,
+//            style = MaterialTheme.typography.headlineSmall,
+//            fontWeight = FontWeight.Bold
+//        )
+//
+//        Text(
+//            text = email,
+//            style = MaterialTheme.typography.bodyMedium,
+//            color = MaterialTheme.colorScheme.onSurfaceVariant
+//        )
+//    }
+//}
 
 @Composable
 fun LogoutDialog(
@@ -419,6 +440,198 @@ fun LogoutDialog(
 }
 
 
+//@Composable
+//fun AccountInfoCard(
+//    fullName: String,
+//    email: String,
+//    onEditClick: () -> Unit
+//) {
+//    Card(
+//        modifier = Modifier.fillMaxWidth(),
+//        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+//        shape = RoundedCornerShape(16.dp)
+//    ) {
+//        Column(
+//            modifier = Modifier.padding(16.dp),
+//            verticalArrangement = Arrangement.spacedBy(16.dp)
+//        ) {
+//            Row(
+//                modifier = Modifier.fillMaxWidth(),
+//                horizontalArrangement = Arrangement.SpaceBetween,
+//                verticalAlignment = Alignment.CenterVertically
+//            ) {
+//                Text(
+//                    text = "Account Information",
+//                    style = MaterialTheme.typography.titleMedium,
+//                    fontWeight = FontWeight.Bold
+//                )
+//
+//                IconButton(onClick = onEditClick) {
+//                    Icon(
+//                        imageVector = Icons.Default.Edit,
+//                        contentDescription = "Edit Name",
+//                        tint = MaterialTheme.colorScheme.primary
+//                    )
+//                }
+//            }
+//
+//            HorizontalDivider()
+//
+//            // Name
+//            InfoRow(
+//                icon = Icons.Default.Person,
+//                label = "Name",
+//                value = fullName
+//            )
+//
+//            // Email
+//            InfoRow(
+//                icon = Icons.Default.Email,
+//                label = "Email",
+//                value = email
+//            )
+//        }
+//    }
+//}
+
+//@Composable
+//fun PreferencesCard(
+//    preferences: UserPreferences,
+//    onPreferencesClick: () -> Unit
+//) {
+//    Card(
+//        modifier = Modifier.fillMaxWidth(),
+//        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+//        shape = RoundedCornerShape(16.dp)
+//    ) {
+//        Column(
+//            modifier = Modifier.padding(16.dp),
+//            verticalArrangement = Arrangement.spacedBy(16.dp)
+//        ) {
+//            Row(
+//                modifier = Modifier.fillMaxWidth(),
+//                horizontalArrangement = Arrangement.SpaceBetween,
+//                verticalAlignment = Alignment.CenterVertically
+//            ) {
+//                Text(
+//                    text = "Preferences",
+//                    style = MaterialTheme.typography.titleMedium,
+//                    fontWeight = FontWeight.Bold
+//                )
+//
+//                IconButton(onClick = onPreferencesClick) {
+//                    Icon(
+//                        imageVector = Icons.Default.Settings,
+//                        contentDescription = "Edit Preferences",
+//                        tint = MaterialTheme.colorScheme.primary
+//                    )
+//                }
+//            }
+//
+//            HorizontalDivider()
+//
+//            // Theme
+//            InfoRow(
+//                icon = Icons.Default.Star,
+//                label = "Theme",
+//                value = preferences.theme.replaceFirstChar { it.uppercase() }
+//            )
+//
+////            // NEW: Font Family
+////            InfoRow(
+////                icon = Icons.Default.Info,
+////                label = "Default Font",
+////                value = PosterFont.fromString(preferences.defaultFontFamily).displayName
+////            )
+//
+//            // Font Size
+//            InfoRow(
+//                icon = Icons.Default.Info,
+//                label = "Default Font Size",
+//                value = "${preferences.defaultFontSize.toInt()}sp"
+//            )
+//
+//            // Auto Sync
+//            InfoRow(
+//                icon = Icons.Default.Info,
+//                label = "Auto Sync",
+//                value = if (preferences.autoSyncEnabled) "Enabled" else "Disabled"
+//            )
+//        }
+//    }
+//}
+// Replace these composables in your ProfileScreen.kt file
+
+@Composable
+fun ProfileHeader(fullName: String, email: String) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.padding(vertical = 8.dp)
+    ) {
+        // Avatar with enhanced gradient and shadow effect
+        Box(
+            modifier = Modifier
+                .size(120.dp)
+                .clip(CircleShape)
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFF667eea),
+                            Color(0xFF764ba2),
+                            Color(0xFFf093fb)
+                        )
+                    )
+                )
+                .padding(4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFF667eea),
+                                Color(0xFF764ba2)
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+//                    Text(
+//                        text = fullName.firstOrNull()?.uppercase() ?: "U",
+//                        style = MaterialTheme.typography.displayLarge,
+//                        color = Color.White,
+//                        fontWeight = FontWeight.Bold
+//                    )
+                Icon(
+                    Icons.Default.Person,
+                    "person",
+                    tint = Color.White,
+                    modifier = Modifier.size(80.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+            text = fullName,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        Text(
+            text = email,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
 @Composable
 fun AccountInfoCard(
     fullName: String,
@@ -427,12 +640,15 @@ fun AccountInfoCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(16.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -441,34 +657,104 @@ fun AccountInfoCard(
             ) {
                 Text(
                     text = "Account Information",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
                 )
 
-                IconButton(onClick = onEditClick) {
+                FilledTonalIconButton(
+                    onClick = onEditClick,
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                ) {
                     Icon(
                         imageVector = Icons.Default.Edit,
                         contentDescription = "Edit Name",
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
             }
 
-            HorizontalDivider()
-
-            // Name
-            InfoRow(
-                icon = Icons.Default.Person,
-                label = "Name",
-                value = fullName
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
             )
 
-            // Email
-            InfoRow(
-                icon = Icons.Default.Email,
-                label = "Email",
-                value = email
-            )
+            // Name with enhanced design
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Name",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = fullName,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+
+            // Email with enhanced design
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.secondaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Email,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Email",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = email,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
         }
     }
 }
@@ -480,12 +766,15 @@ fun PreferencesCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(16.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -494,40 +783,100 @@ fun PreferencesCard(
             ) {
                 Text(
                     text = "Preferences",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
                 )
 
-                IconButton(onClick = onPreferencesClick) {
+                FilledTonalIconButton(
+                    onClick = onPreferencesClick,
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                ) {
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "Edit Preferences",
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
             }
 
-            HorizontalDivider()
-
-            // Theme
-            InfoRow(
-                icon = Icons.Default.Star,
-                label = "Theme",
-                value = preferences.theme.replaceFirstChar { it.uppercase() }
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
             )
 
-            // Font Size
-            InfoRow(
-                icon = Icons.Default.Info,
+//                // Theme preference
+//                PreferenceRow(
+//                    icon = Icons.Default.Star,
+//                    iconColor = MaterialTheme.colorScheme.tertiary,
+//                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+//                    label = "Theme",
+//                    value = preferences.theme.replaceFirstChar { it.uppercase() }
+//                )
+
+            // Font Size preference
+            PreferenceRow(
+                icon = Icons.Default.SortByAlpha,
+                iconColor = MaterialTheme.colorScheme.primary,
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
                 label = "Default Font Size",
                 value = "${preferences.defaultFontSize.toInt()}sp"
             )
 
-            // Auto Sync
-            InfoRow(
-                icon = Icons.Default.Info,
+            // Auto Sync preference
+            PreferenceRow(
+                icon = Icons.Default.Sync,
+                iconColor = MaterialTheme.colorScheme.secondary,
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
                 label = "Auto Sync",
                 value = if (preferences.autoSyncEnabled) "Enabled" else "Disabled"
+            )
+        }
+    }
+}
+
+@Composable
+private fun PreferenceRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconColor: Color,
+    containerColor: Color,
+    label: String,
+    value: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(containerColor),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconColor,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
     }
@@ -543,72 +892,166 @@ fun ActionsSection(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-
-
-        // export postor button
-        // Export Posters Button (NEW)
-        OutlinedButton(
+        // Export button with gradient-like appearance
+        Button(
             onClick = onExportPostersClick,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = MaterialTheme.colorScheme.primary
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            ),
+            elevation = ButtonDefaults.buttonElevation(
+                defaultElevation = 2.dp,
+                pressedElevation = 6.dp
             )
         ) {
             Icon(
                 imageVector = Icons.Default.Share,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(22.dp),
+                tint = MaterialTheme.colorScheme.onPrimaryContainer
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = "Download/Share All Posters",
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
             )
         }
-        // Logout Button
+
+        // Logout button with modern design
         Button(
             onClick = onLogoutClick,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary
+            ),
+            elevation = ButtonDefaults.buttonElevation(
+                defaultElevation = 2.dp,
+                pressedElevation = 6.dp
             )
         ) {
             Icon(
                 imageVector = Icons.Default.ExitToApp,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(22.dp)
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = "Logout",
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
             )
         }
 
-        // Delete Account Button
+        // Delete Account button with warning styling
         OutlinedButton(
             onClick = onDeleteAccountClick,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.outlinedButtonColors(
                 contentColor = MaterialTheme.colorScheme.error
-            )
+            ),
+            border = BorderStroke(2.dp, MaterialTheme.colorScheme.error)
         ) {
             Icon(
                 imageVector = Icons.Default.Delete,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(22.dp)
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = "Delete Account",
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
             )
         }
     }
 }
+//@Composable
+//fun ActionsSection(
+//    onLogoutClick: () -> Unit,
+//    onDeleteAccountClick: () -> Unit,
+//    onExportPostersClick: () -> Unit,
+//) {
+//    Column(
+//        modifier = Modifier.fillMaxWidth(),
+//        verticalArrangement = Arrangement.spacedBy(12.dp)
+//    ) {
+//
+//
+//        // export postor button
+//        // Export Posters Button (NEW)
+//        OutlinedButton(
+//            onClick = onExportPostersClick,
+//            modifier = Modifier.fillMaxWidth(),
+//            shape = RoundedCornerShape(12.dp),
+//            colors = ButtonDefaults.outlinedButtonColors(
+//                contentColor = MaterialTheme.colorScheme.primary
+//            )
+//        ) {
+//            Icon(
+//                imageVector = Icons.Default.Share,
+//                contentDescription = null,
+//                modifier = Modifier.size(20.dp)
+//            )
+//            Spacer(modifier = Modifier.width(8.dp))
+//            Text(
+//                text = "Download/Share All Posters",
+//                style = MaterialTheme.typography.bodyLarge
+//            )
+//        }
+//        // Logout Button
+//        Button(
+//            onClick = onLogoutClick,
+//            modifier = Modifier.fillMaxWidth(),
+//            shape = RoundedCornerShape(12.dp),
+//            colors = ButtonDefaults.buttonColors(
+//                containerColor = MaterialTheme.colorScheme.primary
+//            )
+//        ) {
+//            Icon(
+//                imageVector = Icons.Default.ExitToApp,
+//                contentDescription = null,
+//                modifier = Modifier.size(20.dp)
+//            )
+//            Spacer(modifier = Modifier.width(8.dp))
+//            Text(
+//                text = "Logout",
+//                style = MaterialTheme.typography.bodyLarge
+//            )
+//        }
+//
+//        // Delete Account Button
+//        OutlinedButton(
+//            onClick = onDeleteAccountClick,
+//            modifier = Modifier.fillMaxWidth(),
+//            shape = RoundedCornerShape(12.dp),
+//            colors = ButtonDefaults.outlinedButtonColors(
+//                contentColor = MaterialTheme.colorScheme.error
+//            )
+//        ) {
+//            Icon(
+//                imageVector = Icons.Default.Delete,
+//                contentDescription = null,
+//                modifier = Modifier.size(20.dp)
+//            )
+//            Spacer(modifier = Modifier.width(8.dp))
+//            Text(
+//                text = "Delete Account",
+//                style = MaterialTheme.typography.bodyLarge
+//            )
+//        }
+//    }
+//}
 
 @Composable
 fun InfoRow(
@@ -697,6 +1140,7 @@ fun PreferencesDialog(
     var theme by remember { mutableStateOf(preferences.theme) }
     var fontSize by remember { mutableFloatStateOf(preferences.defaultFontSize) }
     var autoSync by remember { mutableStateOf(preferences.autoSyncEnabled) }
+    var fontFamily by remember { mutableStateOf(preferences.defaultFontFamily) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -710,26 +1154,53 @@ fun PreferencesDialog(
             Column(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Theme Selection
-                Text(
-                    "Theme",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Medium
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilterChip(
-                        selected = theme == "light",
-                        onClick = { theme = "light" },
-                        label = { Text("Light") }
-                    )
-                    FilterChip(
-                        selected = theme == "dark",
-                        onClick = { theme = "dark" },
-                        label = { Text("Dark") }
-                    )
-                }
+//                    // Theme Selection
+//                    Text(
+//                        "Theme",
+//                        style = MaterialTheme.typography.labelLarge,
+//                        fontWeight = FontWeight.Medium
+//                    )
+//                    Row(
+//                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+//                    ) {
+//                        FilterChip(
+//                            selected = theme == "light",
+//                            onClick = { theme = "light" },
+//                            label = { Text("Light") }
+//                        )
+//                        FilterChip(
+//                            selected = theme == "dark",
+//                            onClick = { theme = "dark" },
+//                            label = { Text("Dark") }
+//                        )
+//                    }
+
+//                // NEW: Font Family Selection
+//                Text(
+//                    "Default Font Style",
+//                    style = MaterialTheme.typography.labelLarge,
+//                    fontWeight = FontWeight.Medium
+//                )
+//                Column(
+//                    verticalArrangement = Arrangement.spacedBy(8.dp)
+//                ) {
+//                    PosterFont.values().forEach { font ->
+//                        FilterChip(
+//                            selected = fontFamily == font.name,
+//                            onClick = { fontFamily = font.name },
+//                            label = {
+//                                Text(
+//                                    font.displayName,
+//                                    fontFamily = androidx.compose.ui.text.font.FontFamily(
+//                                        font.toTypeface()
+//                                    )
+//                                )
+//                            },
+//                            modifier = Modifier.fillMaxWidth()
+//                        )
+//                    }
+//                }
+
 
                 // Font Size Slider
                 Text(
@@ -740,8 +1211,8 @@ fun PreferencesDialog(
                 Slider(
                     value = fontSize,
                     onValueChange = { fontSize = it },
-                    valueRange = 16f..40f,
-                    steps = 11
+                    valueRange = 16f..26f,
+                    steps = 5
                 )
 
                 // Auto Sync Toggle
@@ -769,7 +1240,8 @@ fun PreferencesDialog(
                         preferences.copy(
                             theme = theme,
                             defaultFontSize = fontSize,
-                            autoSyncEnabled = autoSync
+                            autoSyncEnabled = autoSync,
+                            defaultFontFamily = fontFamily
                         )
                     )
                 }
@@ -788,6 +1260,8 @@ fun PreferencesDialog(
 
 @Composable
 fun DeleteAccountDialog(
+    password: String,
+    onPasswordChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
@@ -808,14 +1282,34 @@ fun DeleteAccountDialog(
             )
         },
         text = {
-            Text(
-                "Are you sure you want to delete your account? This will permanently delete:\n\n" +
-                        "• Your profile information\n" +
-                        "• All saved posters\n" +
-                        "• Your preferences\n\n" +
-                        "This action cannot be undone.",
-                style = MaterialTheme.typography.bodyMedium
-            )
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    "Are you sure you want to delete your account? This will permanently delete:\n\n" +
+                            "• Your profile information\n" +
+                            "• All saved posters\n" +
+                            "• Your preferences\n\n" +
+                            "This action cannot be undone.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                // Password field for reauthentication
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = onPasswordChange,
+                    label = { Text("Enter your password to confirm") },
+                    placeholder = { Text("Password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.error,
+                        focusedLabelColor = MaterialTheme.colorScheme.error
+                    )
+                )
+            }
         },
         confirmButton = {
             Button(
@@ -835,6 +1329,8 @@ fun DeleteAccountDialog(
         shape = RoundedCornerShape(16.dp)
     )
 }
+
+
 //@Composable
 //fun ProfileScreen(
 //    modifier: Modifier = Modifier,

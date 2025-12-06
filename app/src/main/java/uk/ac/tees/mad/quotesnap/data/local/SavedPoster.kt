@@ -13,5 +13,6 @@ data class SavedPoster(
     val backgroundColor: String="#667eea",  // Store as hex string "#667eea"
     val textColor: String="#FFFFFF",
     val fontSize: Float=24f,
+    val fontFamily: String = "SANS_SERIF",
     val timestamp: Long = System.currentTimeMillis()
 )
