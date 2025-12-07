@@ -10,13 +10,13 @@ import uk.ac.tees.mad.quotesnap.data.models.quote.QuotableResponse
 // end point to get the random quote with the tag
 interface QuotableApi {
 
-    @GET("random")
+    @GET("api/random")
     suspend fun getRandomQuote(
         @Query("tags") tags: String = "motivational",
         @Query("maxLength") maxLength: Int = 150
-    ): QuotableResponse
+    ): List<QuotableResponse>
 
     companion object {
-        const val BASE_URL = "https://api.quotable.io/"
+        const val BASE_URL = "https://zenquotes.io/"
     }
 }

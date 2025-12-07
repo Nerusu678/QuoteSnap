@@ -47,6 +47,10 @@ class CameraViewModel @Inject constructor(
 
         viewModelScope.launch {
             var tempFile: File? = null
+            var originalBitmap: Bitmap? = null
+            var rotatedBitmap: Bitmap? = null
+            var compressedBitmap: Bitmap? = null
+
             try {
                 _cameraState.update { it.copy(isProcessing = true, errorMessage = null) }
 
@@ -56,21 +60,21 @@ class CameraViewModel @Inject constructor(
                     _cameraState.update {
                         it.copy(
                             isProcessing = false,
-                            showPreview = true,  // ✅ CHANGED: Keep preview
+                            showPreview = true,
                             errorMessage = "Failed to read image file"
                         )
                     }
                     return@launch
                 }
 
-                val originalBitmap = BitmapFactory.decodeStream(inputStream)
+                originalBitmap = BitmapFactory.decodeStream(inputStream)
                 inputStream.close()
 
                 if (originalBitmap == null) {
                     _cameraState.update {
                         it.copy(
                             isProcessing = false,
-                            showPreview = true,  // ✅ CHANGED: Keep preview
+                            showPreview = true,
                             errorMessage = "Invalid image format"
                         )
                     }
@@ -78,29 +82,43 @@ class CameraViewModel @Inject constructor(
                 }
 
                 // Apply EXIF rotation for OCR accuracy
-                val rotatedBitmap = applyExifRotation(context, imageUri, originalBitmap)
+                rotatedBitmap = applyExifRotation(context, imageUri, originalBitmap)
                 if (rotatedBitmap !== originalBitmap) {
-                    originalBitmap.recycle()
+                    originalBitmap?.recycle()
+                    originalBitmap = null
                 }
 
                 // Compress image for API (max 1MB, 2048x2048)
-                val compressedBitmap = resizeBitmap(rotatedBitmap, 2048, 2048)
-                rotatedBitmap.recycle()
+                compressedBitmap = resizeBitmap(rotatedBitmap!!, 2048, 2048)
+                if (compressedBitmap !== rotatedBitmap) {
+                    rotatedBitmap?.recycle()
+                    rotatedBitmap = null
+                }
 
                 // Save to temp file with quality adjustment
                 tempFile = File(context.cacheDir, "ocr_${System.currentTimeMillis()}.jpg")
                 var quality = 90
 
+                // ✅ FIX: Compress once, check size, then re-compress if needed
                 do {
                     tempFile.outputStream().use { out ->
-                        compressedBitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
+                        // ✅ Make sure bitmap is not recycled before compressing
+                        if (compressedBitmap?.isRecycled == true) {
+                            throw IllegalStateException("Bitmap was recycled before compression")
+                        }
+                        compressedBitmap?.compress(Bitmap.CompressFormat.JPEG, quality, out)
                     }
+
                     if (tempFile.length() > 1_048_576 && quality > 60) {
                         quality -= 10
-                    } else break
+                    } else {
+                        break
+                    }
                 } while (quality >= 60)
 
-                compressedBitmap.recycle()
+                // ✅ NOW recycle the bitmap after all compression is done
+                compressedBitmap?.recycle()
+                compressedBitmap = null
 
                 // Call OCR API
                 val requestBody = tempFile.asRequestBody("image/jpeg".toMediaTypeOrNull())
@@ -129,7 +147,7 @@ class CameraViewModel @Inject constructor(
                     _cameraState.update {
                         it.copy(
                             isProcessing = false,
-                            showPreview = true,  // ✅ CHANGED: Keep preview
+                            showPreview = true,
                             errorMessage = errorMsg
                         )
                     }
@@ -137,7 +155,7 @@ class CameraViewModel @Inject constructor(
                     _cameraState.update {
                         it.copy(
                             isProcessing = false,
-                            showPreview = false,  // ✅ CORRECT: Hide on success
+                            showPreview = false,
                             isTextExtracted = true,
                             extractedText = extractedText.trim()
                         )
@@ -148,7 +166,7 @@ class CameraViewModel @Inject constructor(
                 _cameraState.update {
                     it.copy(
                         isProcessing = false,
-                        showPreview = true,  // ✅ CHANGED: Keep preview
+                        showPreview = true,
                         errorMessage = "Connection timed out. Please check your internet and try again."
                     )
                 }
@@ -156,7 +174,7 @@ class CameraViewModel @Inject constructor(
                 _cameraState.update {
                     it.copy(
                         isProcessing = false,
-                        showPreview = true,  // ✅ CHANGED: Keep preview
+                        showPreview = true,
                         errorMessage = "No internet connection. Please check your network."
                     )
                 }
@@ -164,7 +182,7 @@ class CameraViewModel @Inject constructor(
                 _cameraState.update {
                     it.copy(
                         isProcessing = false,
-                        showPreview = true,  // ✅ CHANGED: Keep preview
+                        showPreview = true,
                         errorMessage = "Failed to read image: ${e.localizedMessage}"
                     )
                 }
@@ -172,11 +190,15 @@ class CameraViewModel @Inject constructor(
                 _cameraState.update {
                     it.copy(
                         isProcessing = false,
-                        showPreview = true,  // ✅ CHANGED: Keep preview
+                        showPreview = true,
                         errorMessage = "Failed to extract text: ${e.localizedMessage}"
                     )
                 }
             } finally {
+                // ✅ Clean up all bitmaps in finally block
+                originalBitmap?.let { if (!it.isRecycled) it.recycle() }
+                rotatedBitmap?.let { if (!it.isRecycled) it.recycle() }
+                compressedBitmap?.let { if (!it.isRecycled) it.recycle() }
                 tempFile?.delete()
             }
         }

@@ -9,14 +9,13 @@ data class Quote(
 
 // API Response data class
 data class QuotableResponse(
-    val _id: String,
-    val content: String,
-    val author: String,
-    val tags: List<String>
+    val q: String,
+    val a: String,
+    val h: String
 ) {
     fun toQuote() = Quote(
-        content = content,
-        author = author
+        content = q,
+        author = a
     )
 }
 

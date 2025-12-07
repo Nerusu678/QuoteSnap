@@ -28,8 +28,9 @@ class QuoteSnapRepository @Inject constructor(
 
     suspend fun getRandomQuote(): Result<Quote> {
         return try {
-            val response = quotableApi.getRandomQuote(tags = "motivational")
-            Result.success(response.toQuote())
+            val quote = quotableApi.getRandomQuote().firstOrNull()
+                ?: throw Exception("Empty quote response")
+            Result.success(quote.toQuote())
         } catch (e: Exception) {
             Log.d("QuoteSnapRepository", "getRandomQuote error: ${e.message}")
             Result.failure(e)
@@ -47,7 +48,7 @@ class QuoteSnapRepository @Inject constructor(
 
             Log.d("QuoteSnapRepository", "Searching quote with tag: $tag")
             val response = quotableApi.getRandomQuote(tags = tag)
-            Result.success(response.toQuote())
+            Result.success(response.first().toQuote())
         } catch (e: Exception) {
             Log.d("QuoteSnapRepository", "getQuoteForText error: ${e.message}")
             // Fallback to random quote
